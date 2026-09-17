@@ -16,9 +16,10 @@ mail providers and to the internal ntfy service only.
 ## Files
 
 ```
-watcher/watcher.py      polling + notification logic (stdlib only)
+watcher/watcher.py      IDLE + polling + notification logic (stdlib only)
 watcher/Dockerfile      python:3.14-slim, runs as non-root (UID 1000)
-compose.yaml            the mail2ntfy service (no ports)
+compose.yaml            the mail2ntfy service (pulls the GHCR image, no ports)
+.github/workflows/build.yml  builds and pushes the image to GHCR
 .env.example            every variable, with comments
 .gitignore              excludes .env, *.db, __pycache__/, *.pyc
 ```
@@ -36,26 +37,34 @@ deployment (no flood of old mail). Reconnects use exponential backoff.
 
 ## Setup
 
-**1. Push to GitHub** (on your machine, inside this folder):
+**1. Push to GitHub.** The image is built in CI, not on the VPS. On every push
+to `main` (or a `v*` tag), `.github/workflows/build.yml` builds
+`watcher/Dockerfile` and pushes `ghcr.io/music47ell/mail2ntfy:latest` to GHCR.
 
 ```powershell
-git init -b main
 git add .
 git status                 # confirm no .env / *.db before committing
-git commit -m "Initial email notification service"
-git remote add origin https://github.com/<you>/mail2ntfy.git
-git push -u origin main
+git commit -m "..."
+git push
 ```
 
-(or `gh repo create mail2ntfy --private --source=. --remote=origin --push`)
+**2. Make the image pullable.** The GHCR package is private by default, so
+either:
 
-**2. Prepare the state directory once on the VPS** (watcher runs as UID 1000):
+- set it public: GitHub → your profile → **Packages** → `mail2ntfy` →
+  **Package settings** → **Change visibility** → Public; or
+- add GHCR credentials (a PAT with `read:packages`) in Dockhand under
+  **Settings → Registries**.
+
+Wait for the **Actions** tab to show a green build before deploying.
+
+**3. Prepare the state directory once on the VPS** (watcher runs as UID 1000):
 
 ```sh
 sudo mkdir -p /opt/docker/data/mail2ntfy && sudo chown -R 1000:1000 /opt/docker/data/mail2ntfy
 ```
 
-**3. Create an ntfy token** (only if access control is on — check
+**4. Create an ntfy token** (only if access control is on — check
 `grep -E '^auth' /opt/docker/data/ntfy/server.yml`; if it prints nothing,
 leave `NTFY_TOKEN` empty):
 
@@ -64,14 +73,14 @@ docker exec -it ntfy ntfy token add <your-username>
 docker exec -it ntfy ntfy access <your-username> allow email rw
 ```
 
-**4. Deploy in Dockhand:** import this git repo → branch `main` → compose file
-`compose.yaml`. Docker builds the image on the VPS automatically; no
-pre-building needed. Set these stack environment variables, then Deploy:
+**5. Deploy in Dockhand:** import this git repo → branch `main` → compose file
+`compose.yaml`. Dockhand pulls the prebuilt image from GHCR; nothing is built
+on the VPS. Set these stack environment variables, then Deploy:
 
 ```
 NTFY_URL=http://ntfy:80
 NTFY_TOPIC=email
-NTFY_TOKEN=<from step 3>
+NTFY_TOKEN=<from step 4>
 GMAIL_USER=            GMAIL_PASSWORD=<Gmail App Password, not your password>
 IMAP_NAME=           IMAP_USER=         IMAP_PASSWORD=
 ```
@@ -91,9 +100,13 @@ Send yourself a test email with a Unicode subject → push arrives within ~1s an
 logs show `[Gmail] server announced new mail (IDLE)` + `[Gmail] new email from
 ...` + `notification sent`. Resend an email you already received → no duplicate.
 
+To update the watcher: push to `main`, wait for the Actions build, then
+redeploy (or "Re-pull images") in Dockhand. `compose.yaml` sets
+`pull_policy: always`, so a redeploy always picks up the freshly built image.
+
 ## Troubleshooting
 
-- **`cannot open database /data/notified.db`** → run the `chown` from Setup step 2.
+- **`cannot open database /data/notified.db`** → run the `chown` from Setup step 3.
 - **Gmail `LOGIN failed`** → enable IMAP in Gmail settings and use an App
   Password (https://myaccount.google.com/apppasswords).
 - **IMAP `LOGIN failed`** → wrong mailbox address/password.
@@ -112,9 +125,13 @@ logs show `[Gmail] server announced new mail (IDLE)` + `[Gmail] new email from
   session may have been silently dropped; the watcher renews IDLE and polls
   every `IDLE_TIMEOUT` seconds, so mail still arrives within that window. Lower
   `IDLE_TIMEOUT` (e.g. 60) if you want faster recovery.
-- **Image not found / pull access denied on deploy** → your Dockhand deploys
-  pre-built images only; you then need a GHCR build workflow (ask, or contact
-  your Dockhand setup).
+- **`pull access denied` / `manifest unknown` on deploy** → the GHCR package is
+  private or the CI build hasn't finished. Make the package public (Setup step
+  2) or add GHCR credentials in Dockhand, and confirm the Actions build is green.
+- **`mkdir /home/dockhand/.docker: read-only file system`** → Dockhand's own
+  container has a read-only `$HOME`. This stack only pulls, so it shouldn't
+  build; if it does, set `DOCKER_CONFIG=/app/data/.docker` on the Dockhand
+  container and restart it.
 - **Reset state** (stop notifications permanently for old mail or fix a
   mistake): `sudo rm -f /opt/docker/data/mail2ntfy/notified.db*`, then
   restart — it re-baselines without spamming old mail.

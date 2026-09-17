@@ -1,6 +1,8 @@
 # mail2ntfy: posts new-mail notifications from IMAP mailboxes to the
 # existing self-hosted ntfy container over the shared "tunnel-net" network.
 #
+# The image is built by GitHub Actions (.github/workflows/build.yml) and
+# pushed to GHCR, so the VPS only pulls -- nothing is built in Dockhand.
 # The ntfy service itself lives in a SEPARATE stack/repository. Only the
 # mail2ntfy service is defined here. It intentionally has no "ports:",
 # no host networking, and no public HTTP endpoint.
@@ -8,8 +10,8 @@
 name: mail2ntfy
 services:
   mail2ntfy:
-    build:
-      context: ./watcher
+    image: ghcr.io/music47ell/mail2ntfy:latest
+    pull_policy: always
     container_name: mail2ntfy
     restart: unless-stopped
     environment:
