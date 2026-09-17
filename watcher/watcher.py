@@ -337,7 +337,7 @@ class Account:
             sender, recipient, subject = header
             self._info("new email from %s: %s", sender, subject)
             try:
-                send_ntfy(sender, f"From: {sender}\nTo: {recipient}")
+                send_ntfy("You've Got Mail", f"From: {sender}\nTo: {recipient}")
             except Exception as exc:
                 # Leave the UID unmarked and stop advancing past it; it will be
                 # retried on a later poll. Later mail is still delivered.

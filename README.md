@@ -100,7 +100,7 @@ Send yourself a test email with a Unicode subject → push arrives within ~1s an
 logs show `[Gmail] server announced new mail (IDLE)` + `[Gmail] new email from
 ...` + `notification sent`. Resend an email you already received → no duplicate.
 
-Notifications show the **sender as the title** (prefixed with the 📧 tag) and a
+Notifications use the title `You've Got Mail` (prefixed with the 📧 tag) and a
 plain-text body with `From:` and `To:` lines. To change this, edit the payload
 in `send_ntfy()` and the `send_ntfy(...)` call in `_poll_once()`.
 
