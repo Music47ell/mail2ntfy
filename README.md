@@ -18,7 +18,7 @@ mail providers and to the internal ntfy service only.
 ```
 watcher/watcher.py      polling + notification logic (stdlib only)
 watcher/Dockerfile      python:3.14-slim, runs as non-root (UID 1000)
-docker-compose.yml      the mail2ntfy service (no ports)
+compose.yaml            the mail2ntfy service (no ports)
 .env.example            every variable, with comments
 .gitignore              excludes .env, *.db, __pycache__/, *.pyc
 ```
@@ -65,7 +65,7 @@ docker exec -it ntfy ntfy access <your-username> allow email rw
 ```
 
 **4. Deploy in Dockhand:** import this git repo → branch `main` → compose file
-`docker-compose.yml`. Docker builds the image on the VPS automatically; no
+`compose.yaml`. Docker builds the image on the VPS automatically; no
 pre-building needed. Set these stack environment variables, then Deploy:
 
 ```
