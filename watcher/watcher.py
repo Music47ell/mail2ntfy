@@ -479,7 +479,7 @@ def main():
         log.critical("cannot open database %s: %s", DB_PATH, exc)
         log.critical(
             "check that the host directory is writable by UID 1000, e.g. "
-            "sudo chown -R 1000:1000 /opt/docker/data/email-watcher"
+            "sudo chown -R 1000:1000 /opt/docker/data/mail2ntfy"
         )
         sys.exit(1)
 

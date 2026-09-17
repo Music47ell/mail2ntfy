@@ -27,7 +27,7 @@ services:
       IMAP_USER: ${IMAP_USER:-}
       IMAP_PASSWORD: ${IMAP_PASSWORD:-}
     volumes:
-      - /opt/docker/data/email-watcher:/data
+      - /opt/docker/data/mail2ntfy:/data
     networks:
       - tunnel-net
 

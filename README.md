@@ -52,7 +52,7 @@ git push -u origin main
 **2. Prepare the state directory once on the VPS** (watcher runs as UID 1000):
 
 ```sh
-sudo mkdir -p /opt/docker/data/email-watcher && sudo chown -R 1000:1000 /opt/docker/data/email-watcher
+sudo mkdir -p /opt/docker/data/mail2ntfy && sudo chown -R 1000:1000 /opt/docker/data/mail2ntfy
 ```
 
 **3. Create an ntfy token** (only if access control is on — check
@@ -116,7 +116,7 @@ logs show `[Gmail] server announced new mail (IDLE)` + `[Gmail] new email from
   pre-built images only; you then need a GHCR build workflow (ask, or contact
   your Dockhand setup).
 - **Reset state** (stop notifications permanently for old mail or fix a
-  mistake): `sudo rm -f /opt/docker/data/email-watcher/notified.db*`, then
+  mistake): `sudo rm -f /opt/docker/data/mail2ntfy/notified.db*`, then
   restart — it re-baselines without spamming old mail.
 
 ## Security
