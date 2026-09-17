@@ -167,7 +167,14 @@ def send_ntfy(title, message):
     topic = os.environ.get("NTFY_TOPIC", "email").strip("/")
     token = os.environ.get("NTFY_TOKEN", "").strip()
     url = f"{base}/{topic}"
-    body = json.dumps({"title": title, "message": message}).encode("utf-8")
+    body = json.dumps(
+        {
+            "title": title,
+            "message": message,
+            "tags": ["email"],
+            "markdown": True,
+        }
+    ).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
     req.add_header("Content-Type", "application/json")
     req.add_header("User-Agent", "mail2ntfy/1.0")
@@ -329,10 +336,7 @@ class Account:
             sender, subject = header
             self._info("new email from %s: %s", sender, subject)
             try:
-                send_ntfy(
-                    f"New email — {self.label}",
-                    f"From: {sender}\nSubject: {subject}",
-                )
+                send_ntfy(sender, f"**Subject:** {subject}")
             except Exception as exc:
                 # Leave the UID unmarked and stop advancing past it; it will be
                 # retried on a later poll. Later mail is still delivered.
