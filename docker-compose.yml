@@ -1,0 +1,36 @@
+# mail2ntfy: posts new-mail notifications from IMAP mailboxes to the
+# existing self-hosted ntfy container over the shared "tunnel-net" network.
+#
+# The ntfy service itself lives in a SEPARATE stack/repository. Only the
+# mail2ntfy service is defined here. It intentionally has no "ports:",
+# no host networking, and no public HTTP endpoint.
+
+name: mail2ntfy
+services:
+  mail2ntfy:
+    build:
+      context: ./watcher
+    container_name: mail2ntfy
+    restart: unless-stopped
+    environment:
+      NTFY_URL: ${NTFY_URL:-http://ntfy:80}
+      NTFY_TOPIC: ${NTFY_TOPIC:-email}
+      NTFY_TOKEN: ${NTFY_TOKEN:-}
+      POLL_INTERVAL: ${POLL_INTERVAL:-30}
+      IDLE_TIMEOUT: ${IDLE_TIMEOUT:-300}
+      RECONNECT_BASE_DELAY: ${RECONNECT_BASE_DELAY:-5}
+      RECONNECT_MAX_DELAY: ${RECONNECT_MAX_DELAY:-300}
+      LOG_LEVEL: ${LOG_LEVEL:-INFO}
+      GMAIL_USER: ${GMAIL_USER:-}
+      GMAIL_PASSWORD: ${GMAIL_PASSWORD:-}
+      IMAP_NAME: ${IMAP_NAME:-}
+      IMAP_USER: ${IMAP_USER:-}
+      IMAP_PASSWORD: ${IMAP_PASSWORD:-}
+    volumes:
+      - /opt/docker/data/email-watcher:/data
+    networks:
+      - tunnel-net
+
+networks:
+  tunnel-net:
+    external: true
