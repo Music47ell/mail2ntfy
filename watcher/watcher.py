@@ -150,15 +150,15 @@ def _decode_mime(value):
     return re.sub(r"[\r\n\t]+", " ", text).strip()
 
 
-def _format_sender(raw_from):
-    """Return a display string for a From header, e.g. 'Name <addr>'."""
-    name, addr = parseaddr(raw_from or "")
+def _format_address(raw_header):
+    """Return a display string for an address header, e.g. 'Name <addr>'."""
+    name, addr = parseaddr(raw_header or "")
     name = _decode_mime(name)
     if name and addr:
         return f"{name} <{addr}>"
     if addr:
         return addr
-    return _decode_mime(raw_from) or "unknown sender"
+    return _decode_mime(raw_header) or "unknown"
 
 
 def send_ntfy(title, message):
@@ -173,7 +173,6 @@ def send_ntfy(title, message):
             "title": title,
             "message": message,
             "tags": ["email"],
-            "markdown": True,
         }
     ).encode("utf-8")
     req = urllib.request.Request(url, data=body, method="POST")
@@ -277,8 +276,8 @@ class Account:
         )
 
     def _fetch_header(self, conn, uid):
-        """Return (sender, subject) for one message. Returns None if the
-        message vanished between the search and this fetch."""
+        """Return (sender, recipient, subject) for one message. Returns None
+        if the message vanished between the search and this fetch."""
         typ, data = conn.uid("FETCH", str(uid), "(BODY.PEEK[HEADER])")
         if typ != "OK":
             raise RuntimeError("UID FETCH failed")
@@ -292,8 +291,9 @@ class Account:
             return None
         msg = email.message_from_bytes(raw)
         subject = _decode_mime(msg.get("Subject", "")) or "(no subject)"
-        sender = _format_sender(msg.get("From", ""))
-        return sender, subject
+        sender = _format_address(msg.get("From", ""))
+        recipient = _format_address(msg.get("To", ""))
+        return sender, recipient, subject
 
     # -- polling -----------------------------------------------------------
 
@@ -334,10 +334,10 @@ class Account:
                     changed = True
                 continue
 
-            sender, subject = header
+            sender, recipient, subject = header
             self._info("new email from %s: %s", sender, subject)
             try:
-                send_ntfy(sender, f"**Subject:** {subject}")
+                send_ntfy(sender, f"From: {sender}\nTo: {recipient}")
             except Exception as exc:
                 # Leave the UID unmarked and stop advancing past it; it will be
                 # retried on a later poll. Later mail is still delivered.
