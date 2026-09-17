@@ -166,9 +166,10 @@ def send_ntfy(title, message):
     base = os.environ.get("NTFY_URL", "http://ntfy:80").rstrip("/")
     topic = os.environ.get("NTFY_TOPIC", "email").strip("/")
     token = os.environ.get("NTFY_TOKEN", "").strip()
-    url = f"{base}/{topic}"
+    url = f"{base}/"
     body = json.dumps(
         {
+            "topic": topic,
             "title": title,
             "message": message,
             "tags": ["email"],
