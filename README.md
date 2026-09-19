@@ -1,13 +1,13 @@
 # mail2ntfy
 
-Watches one Gmail mailbox and one IMAP mailbox over IMAP and pushes a
+Watches one Gmail mailbox and one generic IMAP mailbox and pushes a
 notification to your existing self-hosted [ntfy](https://ntfy.sh) server when
 new email arrives. Notifications are near-instant thanks to IMAP IDLE.
 
 ```
-Gmail / IMAP → IMAP (993, outbound only) → mail2ntfy container
-              → ntfy container on the shared "tunnel-net" Docker network
-              → your Android ntfy app
+Gmail / IMAP → IMAP (993/143, outbound only) → mail2ntfy container
+            → ntfy container on the shared "tunnel-net" Docker network
+            → your Android ntfy app
 ```
 
 No inbound ports are opened. The watcher makes outbound connections to the
@@ -82,12 +82,16 @@ NTFY_URL=http://ntfy:80
 NTFY_TOPIC=email
 NTFY_TOKEN=<from step 4>
 GMAIL_USER=            GMAIL_PASSWORD=<Gmail App Password, not your password>
-IMAP_NAME=           IMAP_USER=         IMAP_PASSWORD=
+IMAP_HOST=             IMAP_PORT=993        IMAP_STARTTLS=false
+IMAP_NAME=             IMAP_USER=           IMAP_PASSWORD=
 ```
 
-Only accounts with both `USER` and `PASSWORD` set are monitored; leave the
-other blank. `NAME` is the label shown in the notification. See `.env.example`
-for all options (poll/IDLE timing, log level, reconnect bounds).
+Only accounts with all required variables set are monitored; leave the rest
+blank. `GMAIL_*` always uses `imap.gmail.com:993`. The generic `IMAP_*` account
+uses `IMAP_PORT` (default 993, implicit TLS) and, with `IMAP_STARTTLS=true`,
+upgrades a port-143 connection via STARTTLS. `NAME` is only the log label (it
+defaults to `IMAP_USER`). See `.env.example` for all options (timing, log level,
+reconnect bounds) and example provider hosts.
 
 ## Check it works
 
@@ -113,18 +117,20 @@ redeploy (or "Re-pull images") in Dockhand. `compose.yaml` sets
 - **`cannot open database /data/notified.db`** → run the `chown` from Setup step 3.
 - **Gmail `LOGIN failed`** → enable IMAP in Gmail settings and use an App
   Password (https://myaccount.google.com/apppasswords).
-- **IMAP `LOGIN failed`** → wrong mailbox address/password.
+- **IMAP `LOGIN failed`** → wrong `IMAP_HOST`/`IMAP_PORT`/`IMAP_USER`/
+  `IMAP_PASSWORD`; the provider may need an app-specific password, or (on port
+  143) `IMAP_STARTTLS=true`.
 - **ntfy `401/403`** → wrong `NTFY_TOKEN`, or token's user can't publish:
   `docker exec -it ntfy ntfy access <username> allow <topic> rw`.
 - **`cannot reach ntfy at http://ntfy:80`** → both containers must be on the
   same network: `docker network inspect tunnel-net`.
 - **Container restarts / no logs** → no mailboxes configured (`GMAIL_USER`/
-  `GMAIL_PASSWORD` and `IMAP_USER`/`IMAP_PASSWORD` all empty); check the
-  Dockhand env vars were applied.
+  `GMAIL_PASSWORD` and `IMAP_HOST`/`IMAP_USER`/`IMAP_PASSWORD` all empty); check
+  the Dockhand env vars were applied.
 - **`connected` but notifications are slow** → the server may not advertise
   IDLE; the log will say `server does not advertise IDLE; polling every ...`.
-  Gmail and IMAP both support IDLE, so this usually means a proxy/firewall is
-  stripping capabilities.
+  Gmail and most providers support IDLE, so this usually means a proxy/firewall
+  is stripping capabilities.
 - **Notifications stop after a while but `connected` is logged** → the IDLE
   session may have been silently dropped; the watcher renews IDLE and polls
   every `IDLE_TIMEOUT` seconds, so mail still arrives within that window. Lower
@@ -144,5 +150,5 @@ redeploy (or "Re-pull images") in Dockhand. `compose.yaml` sets
 
 No `ports:`, no host networking, no public endpoints. Credentials/token come
 only from environment variables and are never logged or committed. Email
-bodies are never fetched; only the From/Subject headers needed for the
+bodies are never fetched; only the From/To/Subject headers needed for the
 notification (via `BODY.PEEK`, so mail stays unread).

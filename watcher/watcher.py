@@ -44,8 +44,6 @@ IDLE_TIMEOUT = max(5, min(int(os.environ.get("IDLE_TIMEOUT", "300")), 1740))
 
 GMAIL_HOST = "imap.gmail.com"
 GMAIL_PORT = 993
-IMAP_HOST = "imap.example.com"
-IMAP_PORT = 993
 
 
 # ---------------------------------------------------------------------------
@@ -202,13 +200,14 @@ def send_ntfy(title, message):
 
 
 class Account:
-    def __init__(self, key, label, host, port, user, password):
+    def __init__(self, key, label, host, port, user, password, starttls=False):
         self.key = key
         self.label = label
         self.host = host
         self.port = port
         self.user = user
         self.password = password
+        self.starttls = starttls
 
     # -- logging helpers (never log credentials) --------------------------
 
@@ -230,8 +229,13 @@ class Account:
 
     def _connect(self):
         ctx = ssl.create_default_context()
-        conn = imaplib.IMAP4_SSL(self.host, self.port, ssl_context=ctx)
-        conn.sock.settimeout(60)
+        if self.starttls:
+            conn = imaplib.IMAP4(self.host, self.port)
+            conn.sock.settimeout(60)
+            conn.starttls(ssl_context=ctx)
+        else:
+            conn = imaplib.IMAP4_SSL(self.host, self.port, ssl_context=ctx)
+            conn.sock.settimeout(60)
         try:
             conn.login(self.user, self.password)
             typ, _data = conn.select("INBOX")
@@ -448,6 +452,24 @@ class Account:
 # ---------------------------------------------------------------------------
 
 
+def _env_bool(name, default=False):
+    value = os.environ.get(name, "").strip().lower()
+    if not value:
+        return default
+    return value in ("1", "true", "yes", "on")
+
+
+def _env_port(name, default):
+    value = os.environ.get(name, "").strip()
+    if not value:
+        return default
+    try:
+        return int(value)
+    except ValueError:
+        log.warning("%s=%r is not a number; using %d", name, value, default)
+        return default
+
+
 def load_accounts():
     """Discover configured accounts from environment variables."""
     accounts = []
@@ -461,17 +483,28 @@ def load_accounts():
         else:
             log.warning("GMAIL_USER and GMAIL_PASSWORD must both be set; ignoring Gmail")
 
+    imap_host = os.environ.get("IMAP_HOST", "").strip()
     imap_user = os.environ.get("IMAP_USER", "").strip()
     imap_pass = os.environ.get("IMAP_PASSWORD", "")
     imap_name = os.environ.get("IMAP_NAME", "").strip()
-    if imap_user or imap_pass:
-        if imap_user and imap_pass:
-            label = imap_name or "IMAP"
+    if imap_host or imap_user or imap_pass:
+        if imap_host and imap_user and imap_pass:
+            label = imap_name or imap_user
             accounts.append(
-                Account("imap", label, IMAP_HOST, IMAP_PORT, imap_user, imap_pass)
+                Account(
+                    "imap",
+                    label,
+                    imap_host,
+                    _env_port("IMAP_PORT", 993),
+                    imap_user,
+                    imap_pass,
+                    starttls=_env_bool("IMAP_STARTTLS"),
+                )
             )
         else:
-            log.warning("IMAP_USER and IMAP_PASSWORD must both be set; ignoring IMAP")
+            log.warning(
+                "IMAP_HOST, IMAP_USER and IMAP_PASSWORD must all be set; ignoring IMAP"
+            )
 
     return accounts
 
@@ -492,7 +525,7 @@ def main():
     if not accounts:
         log.error(
             "no mailboxes configured: set GMAIL_USER/GMAIL_PASSWORD and/or "
-            "IMAP_NAME/USER/PASSWORD in the environment"
+            "IMAP_HOST/IMAP_USER/IMAP_PASSWORD in the environment"
         )
         sys.exit(1)
 
